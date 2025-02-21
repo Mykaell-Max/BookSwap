@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import UserProfile
+from .models import UserProfile, Book, BookExchange
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
@@ -20,10 +20,16 @@ class UserSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         profile_data = validated_data.pop('profile', {})
         user = User.objects.create_user(**validated_data)
-        UserProfile.objects.create(user=user, **profile_data)
-
+        # Tenta obter o perfil criado automaticamente pelo signal; se não existir, cria
+        profile, created = UserProfile.objects.get_or_create(user=user)
+        # Atualiza os campos do perfil com os dados enviados
+        profile.city = profile_data.get('city', profile.city)
+        profile.neighborhood = profile_data.get('neighborhood', profile.neighborhood)
+        profile.phone = profile_data.get('phone', profile.phone)
+        profile.save()
         return user
 
+ 
     def update(self, instance, validated_data):
         profile_data = validated_data.pop('profile', {})
         instance.username = validated_data.get('username', instance.username)
@@ -38,3 +44,29 @@ class UserSerializer(serializers.ModelSerializer):
         profile.save()
 
         return instance
+
+
+class BookSerializer(serializers.ModelSerializer):
+    owner = serializers.ReadOnlyField(source='owner.username')
+
+    class Meta:
+        model = Book
+        fields = ['id', 'title', 'author', 'genre', 'owner', 'created_at']
+
+
+class BookExchangeSerializer(serializers.ModelSerializer):
+    requester = serializers.ReadOnlyField(source='requester.username')
+    receiver = serializers.ReadOnlyField(source='receiver.username')
+    requested_book = BookSerializer(read_only=True)
+    offered_book = BookSerializer(read_only=True)
+    
+    requested_book_id = serializers.PrimaryKeyRelatedField(queryset=Book.objects.all(), source='requested_book', write_only=True)
+    offered_book_id = serializers.PrimaryKeyRelatedField(queryset=Book.objects.all(), source='offered_book', write_only=True)
+    receiver_id = serializers.PrimaryKeyRelatedField(queryset=User.objects.all(), source='receiver', write_only=True)
+
+    class Meta:
+        model = BookExchange
+        fields = [
+            'id', 'requester', 'receiver', 'requested_book', 'offered_book',
+            'requested_book_id', 'offered_book_id', 'receiver_id',
+            'status', 'created_at' ]
