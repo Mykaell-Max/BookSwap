@@ -70,3 +70,24 @@ class BookExchangeSerializer(serializers.ModelSerializer):
             'id', 'requester', 'receiver', 'requested_book', 'offered_book',
             'requested_book_id', 'offered_book_id', 'receiver_id',
             'status', 'created_at' ]
+        
+    
+    def validate(self, data):
+        requester = self.context['request'].user
+        
+        offered_book = data['offered_book_id']  
+
+        if offered_book.owner != requester:
+            raise serializers.ValidationError('You can only offer books you own!')
+
+        return data
+
+
+    def update(self, instance, validated_data):
+        request = self.context["request"] 
+
+        if "status" in validated_data:
+            if request.user != instance.receiver:
+                raise serializers.ValidationError("Only the receiver can accpept or decline an offer!")
+
+        return super().update(instance, validated_data)
