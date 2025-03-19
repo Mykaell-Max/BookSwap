@@ -20,9 +20,7 @@ class UserSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         profile_data = validated_data.pop('profile', {})
         user = User.objects.create_user(**validated_data)
-        # Tenta obter o perfil criado automaticamente pelo signal; se não existir, cria
         profile, created = UserProfile.objects.get_or_create(user=user)
-        # Atualiza os campos do perfil com os dados enviados
         profile.city = profile_data.get('city', profile.city)
         profile.neighborhood = profile_data.get('neighborhood', profile.neighborhood)
         profile.phone = profile_data.get('phone', profile.phone)
